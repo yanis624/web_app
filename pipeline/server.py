@@ -6,17 +6,18 @@ Usage :
   pip install -r requirements.txt
   python server.py
 
-Le serveur démarre sur http://localhost:5000
-Votre site React l'appelle via fetch("http://localhost:5000/analyze")
+Le serveur démarre sur http://localhost:7860
+Votre site React l'appelle via fetch("http://localhost:7860/analyze")
 """
 
 import io
 import os
 import math
+import datetime
 import numpy as np
 import cv2
 from PIL import Image
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from transformers import pipeline, AutoProcessor, AutoModelForCausalLM
 import torch
@@ -26,6 +27,9 @@ import torch
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+REPORTS_DIR = os.path.join(os.path.dirname(__file__), "reports")
+os.makedirs(REPORTS_DIR, exist_ok=True)
 DTYPE = torch.float16 if DEVICE == "cuda" else torch.float32
 
 print(f"[INFO] Device : {DEVICE}")
@@ -45,7 +49,6 @@ print("[2/3] Chargement de Florence-2 (microsoft/Florence-2-base)...")
 florence_processor = AutoProcessor.from_pretrained(
     "microsoft/Florence-2-base",
     trust_remote_code=True,
-    
 )
 florence_model = AutoModelForCausalLM.from_pretrained(
     "microsoft/Florence-2-base",
@@ -58,7 +61,7 @@ print("      ✓ Florence-2 prêt")
 print("[3/3] OpenCV prêt (intégré)")
 print()
 print("=" * 50)
-print("  SERVEUR PRÊT — http://localhost:5000")
+print("  SERVEUR PRÊT — http://localhost:7860")
 print("=" * 50)
 print()
 
@@ -145,7 +148,6 @@ def detect_photos_opencv(image, min_area_ratio=0.02):
         if min_area < area < max_area and 0.2 < aspect < 5.0:
             boxes.append((x, y, w, h))
 
-    # Fusionner les boîtes qui se chevauchent
     if not boxes:
         return []
 
@@ -183,31 +185,26 @@ def analyze_zones(image):
     else:
         gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
 
-    # Redimensionner pour performance
     h, w = gray.shape
     if max(h, w) > 512:
         scale = 512 / max(h, w)
         gray = cv2.resize(gray, (int(w * scale), int(h * scale)))
 
-    # 1. Artefacts — Variance du Laplacien
     lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
     artifact_score = max(0, min(100, int(100 - min(lap_var / 50, 100))))
 
-    # 2. Textures — Écart-type des gradients
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
     sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
     grad_mag = np.sqrt(sobelx**2 + sobely**2)
     grad_std = grad_mag.std()
     texture_score = max(0, min(100, int(100 - min(grad_std / 2, 100))))
 
-    # 3. Patterns spectraux — FFT
     f_transform = np.fft.fft2(gray.astype(np.float64))
     f_shift = np.fft.fftshift(f_transform)
     magnitude = np.log(np.abs(f_shift) + 1)
     spectral_std = magnitude.std()
     spectral_score = max(0, min(100, int(100 - min(spectral_std * 10, 100))))
 
-    # 4. Contours — Densité de bords
     edges = cv2.Canny(gray, 100, 200)
     edge_density = edges.sum() / (gray.shape[0] * gray.shape[1] * 255)
     contour_score = max(0, min(100, int(100 - min(edge_density * 500, 100))))
@@ -220,12 +217,35 @@ def analyze_zones(image):
     ]
 
 
+def save_report(base_name: str, filename: str, verdict: str, confidence: int,
+                ocr_text: str, description: str) -> str:
+    """Sauvegarde OCR + description dans un .txt et retourne son nom de fichier."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_filename = f"{base_name}_{timestamp}.txt"
+    report_path = os.path.join(REPORTS_DIR, report_filename)
+
+    content = (
+        f"=== RAPPORT VERIDEM ===\n"
+        f"Fichier  : {filename}\n"
+        f"Date     : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Verdict  : {verdict} ({confidence}%)\n"
+        f"\n--- OCR ---\n{ocr_text}\n"
+        f"\n--- DESCRIPTION ---\n{description}\n"
+    )
+
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    print(f"  ✓ Rapport sauvegardé : reports/{report_filename}")
+    return report_filename
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # SERVEUR FLASK
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 app = Flask(__name__)
-CORS(app)  # Autorise les appels depuis votre site React
+CORS(app)
 
 
 @app.route("/", methods=["GET"])
@@ -267,21 +287,17 @@ def analyze():
 
     print(f"[ANALYSE] Image reçue : {filename} ({image.width}x{image.height})")
 
-    # ── Étape 1 : Détection de photos ──
     print("  [1/5] Détection de photos (OpenCV)...")
     photo_boxes = detect_photos_opencv(image)
 
-    # ── Étape 2 : OCR ──
     print("  [2/5] Extraction OCR (Florence-2)...")
     ocr_text = extract_ocr(image)
     if not ocr_text or not ocr_text.strip():
         ocr_text = "(aucun texte détecté)"
 
-    # ── Étape 3 : Description globale ──
     print("  [3/5] Description (Florence-2)...")
     description = generate_description(image)
 
-    # ── Étape 4 : Classification globale + par photo ──
     print("  [4/5] Classification IA vs Réel (ViT)...")
     global_class = classify_image(image)
     prob_ai = global_class["probAI"]
@@ -306,11 +322,16 @@ def analyze():
             "probHuman": round(p_human, 4),
         })
 
-    # ── Étape 5 : Analyse par zone ──
     print("  [5/5] Analyse par zone (OpenCV)...")
     zones = analyze_zones(image)
 
-    # ── Métadonnées ──
+    print("  [6/6] Sauvegarde rapport...")
+    verdict_str = "IA" if is_ai else "RÉEL"
+    report_filename = save_report(
+        base_name, filename, verdict_str, confidence,
+        ocr_text, description
+    )
+
     has_exif = hasattr(image, "_getexif") and image._getexif() is not None
     metadata = [
         {"key": "Résolution", "val": f"{image.width} × {image.height} px"},
@@ -337,10 +358,27 @@ def analyze():
         "totalReal": len(photos) - total_ai,
         "metadata": metadata,
         "zones": zones,
+        "reportFile": report_filename,
     }
 
     print(f"  ✓ Terminé — {'IA détectée' if is_ai else 'Image réelle'} ({confidence}%)")
     return jsonify(result)
+
+
+@app.route("/reports", methods=["GET"])
+def list_reports():
+    """Liste tous les rapports .txt disponibles."""
+    files = sorted(
+        [f for f in os.listdir(REPORTS_DIR) if f.endswith(".txt")],
+        reverse=True,
+    )
+    return jsonify({"reports": files, "count": len(files)})
+
+
+@app.route("/reports/<path:filename>", methods=["GET"])
+def get_report(filename):
+    """Retourne le contenu brut d'un rapport .txt."""
+    return send_from_directory(REPORTS_DIR, filename, mimetype="text/plain; charset=utf-8")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -348,4 +386,5 @@ def analyze():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    port = int(os.environ.get("PORT", 7860))
+    app.run(host="0.0.0.0", port=port, debug=False)
