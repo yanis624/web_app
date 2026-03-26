@@ -20,7 +20,7 @@
 import { useState, useEffect, useRef } from "react";
 import reportData from "./data/rapport.json";
 
-const API_URL = "http://localhost:5000";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 /* Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Google Fonts Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */
 const fontLink = document.createElement("link");
