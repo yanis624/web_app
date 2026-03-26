@@ -3,5 +3,6 @@ services:
     name: veridem-pipeline
     runtime: python
     rootDir: pipeline
+    pythonVersion: "3.11.9"
     buildCommand: pip install -r requirements.txt
     startCommand: python server.py
