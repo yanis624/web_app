@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
  *  VERIDEM — Site du projet DIGIDEM
  *  Université de Clermont-Auvergne × Partenaires Erasmus+
@@ -18,7 +18,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import reportData from "./data/rapport.json";
+import ReportDashboard from "./ReportDashboard";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -130,8 +130,6 @@ const STATS = {
   ],
 };
 
-const VISU_THEME_COLORS = [C.navy, C.gold, C.success, C.warning, C.cyan, C.textLight];
-
 function normalizeLookup(value) {
   return String(value || "")
     .toLowerCase()
@@ -139,119 +137,6 @@ function normalizeLookup(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-}
-
-function translateTheme(theme, lang) {
-  if (lang === "fr") return theme;
-
-  const key = normalizeLookup(theme);
-  if (key.includes("polit")) return "Politics";
-  if (key.includes("catastroph") || key.includes("faits divers")) return "Disasters / incidents";
-  if (key.includes("covid") || key.includes("sant")) return "COVID / Health";
-  if (key.includes("technolog")) return "Technology";
-  if (key.includes("deepfake") || key.startsWith("ia ") || key === "ia") return "AI / Deepfake";
-  if (key.includes("relig") || key.includes("hist")) return "Religion / History";
-  if (key.includes("divert")) return "Entertainment";
-  if (key.includes("conspir")) return "Conspiracies";
-  if (key.includes("autre") || key.includes("other")) return "Other";
-  if (key.includes("brit")) return "Celebrities";
-  return theme;
-}
-
-function translatePlatform(platform, lang) {
-  if (lang === "fr") return platform;
-
-  const key = normalizeLookup(platform);
-  if (key === "inconnu") return "Unknown";
-  if (key === "presse") return "Press";
-  return platform;
-}
-
-function translatePattern(pattern, lang) {
-  if (lang === "fr") return pattern;
-
-  const key = normalizeLookup(pattern);
-  if (key.includes("alerte") || key.includes("urgence")) return "Alert / urgency";
-  if (key.includes("partage")) return "Call to share";
-  if (key.includes("mort") || key.includes("deces")) return "Death claim";
-  if (key.includes("complot")) return "Revealed plot";
-  if (key.includes("reference") || key.includes("image") || key === "ia") return "AI / image reference";
-  if (key.includes("scandale") || key.includes("choc")) return "Scandal / shock";
-  return pattern;
-}
-
-function extractYear(filename) {
-  const match = filename?.match(/\b(20\d{2}|19\d{2})\b/);
-  return match ? Number(match[1]) : null;
-}
-
-function buildVisuData(report, lang) {
-  const themeEntries = Object.entries(report.thematiques || {});
-  const totalThemes = themeEntries.reduce((sum, [, count]) => sum + count, 0) || 1;
-  const topThemes = [...themeEntries]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([theme], index) => ({
-      raw: theme,
-      label: translateTheme(theme, lang),
-      color: VISU_THEME_COLORS[index % VISU_THEME_COLORS.length],
-    }));
-
-  const years = [...new Set((report.documents || []).map((doc) => extractYear(doc.fichier)).filter(Boolean))].sort((a, b) => a - b);
-  const temporalData = years.map((year) => {
-    const row = { year: String(year) };
-    topThemes.forEach((theme) => {
-      row[theme.raw] = 0;
-    });
-    (report.documents || []).forEach((doc) => {
-      if (extractYear(doc.fichier) !== year) return;
-      const key = doc.theme;
-      if (row[key] !== undefined) row[key] += 1;
-    });
-    return row;
-  });
-
-  const maxTemporal = temporalData.reduce(
-    (max, row) => Math.max(max, ...topThemes.map((theme) => row[theme.raw] || 0)),
-    0
-  ) || 1;
-
-  const wordCloudData = Object.entries(report.top_mots_ocr || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 36)
-    .map(([text, count]) => ({ text, count, size: 18 + count * 1.1 }));
-
-  const categoryData = themeEntries
-    .sort((a, b) => b[1] - a[1])
-    .map(([theme, count], index) => ({
-      category: translateTheme(theme, lang),
-      count,
-      pct: Math.round((count / totalThemes) * 100),
-      color: VISU_THEME_COLORS[index % VISU_THEME_COLORS.length],
-    }));
-
-  const platformData = Object.entries(report.plateformes || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([platform, count]) => ({ platform: translatePlatform(platform, lang), count }));
-
-  const rhetoricalPatterns = Object.entries(report.patterns_rhetoriques || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([label, count]) => ({ label: translatePattern(label, lang), count }));
-
-  return {
-    totalFiles: report.total_fichiers || 0,
-    totalClassified: report.total_classes || 0,
-    totalUnclassified: report.non_classes || 0,
-    wordCloudData,
-    topThemes,
-    temporalData,
-    maxTemporal,
-    categoryData,
-    platformData,
-    rhetoricalPatterns,
-  };
 }
 
 /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
@@ -480,7 +365,7 @@ function HomePage({ setPage, lang }) {
           </div>
         </FadeIn>
         <FadeIn delay={150}>
-          <a href="https://youtu.be/SanVY3U2f8A" target="_blank" rel="noopener noreferrer"
+          <a href="https://www.youtube.com/watch?v=Ja2VEBRqq0A" target="_blank" rel="noopener noreferrer"
             style={{ display: "block", position: "relative", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`, boxShadow: `0 12px 48px ${C.navy}08`, background: C.navy, aspectRatio: "16/9", cursor: "pointer", textDecoration: "none" }}>
             {/* YouTube thumbnail */}
             <img
@@ -607,7 +492,7 @@ function HomePage({ setPage, lang }) {
       {/* FOOTER */}
       <footer style={{ padding: "40px 32px", textAlign: "center", borderTop: `1px solid ${C.borderLight}`, background: C.ivory }}>
         <div style={{ marginBottom: 16 }}>
-          <VeridemLogo height={22} color={C.textMuted} />
+          <VeridemLogo height={22} color={C.gold} />
         </div>
         <Ornament width={40} style={{ marginBottom: 16 }} />
         <p style={{ fontFamily: FONT.sans, fontSize: 12, color: C.textMuted, lineHeight: 1.7, maxWidth: 700, margin: "0 auto" }}>
@@ -624,257 +509,7 @@ function HomePage({ setPage, lang }) {
    PAGE VISUALISATION
    Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
 function VisuPage({ lang }) {
-  const isEn = lang === "en";
-  const [activeTab, setActiveTab] = useState("wordcloud");
-  const [hoveredBar, setHoveredBar] = useState(null);
-  const data = buildVisuData(reportData, lang);
-  const topTheme = data.categoryData[0]?.category || "N/A";
-  const coverageRate = data.totalFiles ? Math.round((data.totalClassified / data.totalFiles) * 100) : 0;
-  const topPlatformCount = Math.max(...data.platformData.map((item) => item.count), 1);
-  const topPatternCount = Math.max(...data.rhetoricalPatterns.map((item) => item.count), 1);
-  const topWordCount = Math.max(...data.wordCloudData.map((item) => item.count), 1);
-  const yTicks = [1, 0.75, 0.5, 0.25, 0].map((ratio) => Math.round(data.maxTemporal * ratio));
-
-  const stats = [
-    { value: data.totalFiles, label: isEn ? "files collected" : "fichiers collectes" },
-    { value: `${coverageRate}%`, label: isEn ? "classified corpus" : "corpus classe" },
-    { value: data.totalUnclassified, label: isEn ? "unclassified items" : "elements non classes" },
-    { value: topTheme, label: isEn ? "leading theme" : "theme dominant" },
-  ];
-
-  const tabs = [
-    { id: "wordcloud", label: isEn ? "Word cloud" : "Nuage de mots", icon: "01" },
-    { id: "temporal", label: isEn ? "Timeline" : "Chronologie", icon: "02" },
-    { id: "categories", label: isEn ? "Themes & platforms" : "Themes et plateformes", icon: "03" },
-  ];
-
-  return (
-    <div style={{ paddingTop: 68, minHeight: "100vh", background: C.cream }}>
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "48px 24px" }}>
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <Label variant="cyan">{isEn ? "Real dataset" : "Jeu de donnees reel"}</Label>
-          <h1 style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: "clamp(24px, 4vw, 40px)", color: C.navy, margin: "16px 0 0" }}>
-            <span style={{ color: C.gold, fontStyle: "italic" }}>{data.totalFiles}</span> {isEn ? "disinformation items loaded from the report" : "contenus de desinformation charges depuis le rapport"}
-          </h1>
-          <Ornament width={50} style={{ margin: "20px auto" }} />
-          <p style={{ fontFamily: FONT.sans, fontSize: 15, color: C.textLight, maxWidth: 620, margin: "0 auto", lineHeight: 1.75 }}>
-            {isEn ? "These visualizations now read the real JSON report: OCR terms, classified themes, rhetorical patterns and platform mentions extracted by the DIGIDEM pipeline." : "Ces visualisations utilisent maintenant le vrai rapport JSON : termes OCR, thematiques classees, patterns rhetoriques et plateformes extraits par le pipeline DIGIDEM."}
-          </p>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 32 }}>
-          {stats.map((stat, index) => (
-            <div key={index} style={{ background: C.warmWhite, border: `1px solid ${C.border}`, borderRadius: 8, padding: "24px 20px", textAlign: "center" }}>
-              <div style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: index === 3 ? 24 : 32, color: C.navy, lineHeight: 1.1 }}>{stat.value}</div>
-              <div style={{ fontFamily: FONT.sans, fontSize: 12, letterSpacing: 0.4, textTransform: "uppercase", color: C.textMuted, marginTop: 10 }}>{stat.label}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 40 }}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{ background: activeTab === tab.id ? C.warmWhite : "transparent", border: activeTab === tab.id ? `1.5px solid ${C.gold}` : `1px solid ${C.borderLight}`, borderRadius: 6, padding: "12px 24px", fontFamily: FONT.sans, fontWeight: activeTab === tab.id ? 600 : 400, fontSize: 13, color: activeTab === tab.id ? C.navy : C.textMuted, cursor: "pointer", transition: "all 0.3s", boxShadow: activeTab === tab.id ? `0 4px 16px ${C.gold}12` : "none" }}
-            >
-              <span style={{ marginRight: 8, color: C.gold }}>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === "wordcloud" && (
-          <FadeIn>
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.7fr) minmax(280px, 1fr)", gap: 20 }}>
-              <div style={{ background: C.warmWhite, border: `1px solid ${C.border}`, borderRadius: 8, padding: "40px 32px" }}>
-                <h3 style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: 18, color: C.navy, margin: "0 0 8px" }}>{isEn ? "Most frequent OCR terms" : "Termes OCR les plus frequents"}</h3>
-                <p style={{ fontFamily: FONT.sans, fontSize: 13, color: C.textMuted, margin: "0 0 32px" }}>{isEn ? "The cloud is built from the report's `top_mots_ocr` field." : "Le nuage est construit a partir du champ `top_mots_ocr` du rapport."}</p>
-
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: "6px 14px", padding: "20px 0", minHeight: 220 }}>
-                  {data.wordCloudData.map((word, i) => {
-                    const size = Math.max(12, word.size * 0.55);
-                    const opacity = 0.35 + (word.count / topWordCount) * 0.65;
-                    const isGold = i % 3 === 0;
-                    return (
-                      <span
-                        key={i}
-                        style={{ fontSize: size, fontFamily: FONT.serif, fontWeight: word.count > 35 ? 700 : word.count > 22 ? 600 : 400, color: isGold ? C.gold : C.navy, opacity, cursor: "default", transition: "all 0.3s", fontStyle: word.count > 35 ? "italic" : "normal", lineHeight: 1.4 }}
-                        onMouseEnter={(e) => { e.target.style.color = C.gold; e.target.style.opacity = 1; }}
-                        onMouseLeave={(e) => { e.target.style.color = isGold ? C.gold : C.navy; e.target.style.opacity = opacity; }}
-                      >
-                        {word.text}
-                      </span>
-                    );
-                  })}
-                </div>
-
-                <div style={{ borderTop: `1px solid ${C.borderLight}`, marginTop: 24, paddingTop: 16, textAlign: "center" }}>
-                  <p style={{ fontFamily: FONT.sans, fontSize: 11, color: C.textMuted }}>{isEn ? "Displayed size is proportional to the observed frequency in the imported report." : "La taille affichee est proportionnelle a la frequence observee dans le rapport importe."}</p>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ background: C.warmWhite, border: `1px solid ${C.border}`, borderRadius: 8, padding: "28px 24px" }}>
-                  <h3 style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: 16, color: C.navy, margin: "0 0 18px" }}>{isEn ? "Top rhetorical patterns" : "Patterns rhetoriques dominants"}</h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    {data.rhetoricalPatterns.map((pattern, index) => (
-                      <div key={index}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
-                          <span style={{ fontFamily: FONT.sans, fontSize: 13, color: C.navy }}>{pattern.label}</span>
-                          <span style={{ fontFamily: FONT.sans, fontSize: 12, color: C.textMuted }}>{pattern.count}</span>
-                        </div>
-                        <div style={{ height: 6, background: C.borderLight, borderRadius: 99, overflow: "hidden" }}>
-                          <div style={{ width: `${(pattern.count / topPatternCount) * 100}%`, height: "100%", background: `linear-gradient(90deg, ${C.gold}, ${C.gold}88)` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ background: `${C.gold}08`, border: `1px solid ${C.gold}33`, borderRadius: 8, padding: "22px 24px" }}>
-                  <h4 style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: 14, color: C.navy, margin: "0 0 10px" }}>{isEn ? "What changed" : "Ce qui change"}</h4>
-                  <p style={{ fontFamily: FONT.sans, fontSize: 12, color: C.textLight, lineHeight: 1.75, margin: 0 }}>
-                    {isEn ? `The page no longer displays a fictional sample. It now reads ${data.totalFiles} imported files, including ${data.totalClassified} classified items and ${data.totalUnclassified} unclassified ones.` : `La page n'affiche plus un jeu fictif. Elle lit maintenant ${data.totalFiles} fichiers importes, dont ${data.totalClassified} classes et ${data.totalUnclassified} non classes.`}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </FadeIn>
-        )}
-
-        {activeTab === "temporal" && (
-          <FadeIn>
-            <div style={{ background: C.warmWhite, border: `1px solid ${C.border}`, borderRadius: 8, padding: "40px 32px" }}>
-              <h3 style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: 18, color: C.navy, margin: "0 0 8px" }}>{isEn ? "Evolution by year and dominant theme" : "Evolution par annee et thematique dominante"}</h3>
-              <p style={{ fontFamily: FONT.sans, fontSize: 13, color: C.textMuted, margin: "0 0 24px" }}>{isEn ? "Years are inferred from the filenames present in the report. Only the four most represented themes are charted here." : "Les annees sont deduites des noms de fichiers presents dans le rapport. Seules les quatre thematiques les plus representees sont affichees ici."}</p>
-
-              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 24 }}>
-                {data.topThemes.map((theme) => (
-                  <div key={theme.raw} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 12, height: 12, borderRadius: 2, background: theme.color, display: "inline-block" }} />
-                    <span style={{ fontFamily: FONT.sans, fontSize: 12, color: C.textLight }}>{theme.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ overflowX: "auto" }}>
-                <div style={{ minWidth: Math.max(620, data.temporalData.length * 72) }}>
-                  <div style={{ display: "flex" }}>
-                    <div style={{ width: 36, display: "flex", flexDirection: "column", justifyContent: "space-between", textAlign: "right", paddingRight: 8, height: 260 }}>
-                      {yTicks.map((v, index) => (
-                        <span key={index} style={{ fontFamily: FONT.sans, fontSize: 10, color: C.textMuted }}>{v}</span>
-                      ))}
-                    </div>
-                    <div style={{ flex: 1, position: "relative", height: 260 }}>
-                      {[0, 25, 50, 75, 100].map((v) => (
-                        <div key={v} style={{ position: "absolute", left: 0, right: 0, top: `${(1 - v / 100) * 100}%`, borderTop: `1px solid ${C.borderLight}` }} />
-                      ))}
-                      <div style={{ display: "flex", height: "100%", alignItems: "flex-end", justifyContent: "space-between", gap: 6, position: "relative", zIndex: 2 }}>
-                        {data.temporalData.map((row, rowIndex) => (
-                          <div key={row.year} style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 3, height: "100%", justifyContent: "center" }}>
-                            {data.topThemes.map((theme) => {
-                              const value = row[theme.raw] || 0;
-                              const barId = `${rowIndex}-${theme.raw}`;
-                              return (
-                                <div
-                                  key={theme.raw}
-                                  title={`${row.year} - ${theme.label}: ${value}`}
-                                  onMouseEnter={() => setHoveredBar(barId)}
-                                  onMouseLeave={() => setHoveredBar(null)}
-                                  style={{
-                                    width: `${Math.max(12, 68 / Math.max(data.topThemes.length, 1))}%`,
-                                    borderRadius: "3px 3px 0 0",
-                                    height: `${(value / data.maxTemporal) * 100}%`,
-                                    background: theme.color,
-                                    opacity: hoveredBar === barId ? 1 : 0.78,
-                                    transition: "all 0.3s ease",
-                                    minHeight: value > 0 ? 4 : 0,
-                                    cursor: "default",
-                                    transform: hoveredBar === barId ? "scaleY(1.03)" : "scaleY(1)",
-                                    transformOrigin: "bottom",
-                                  }}
-                                />
-                              );
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", marginLeft: 36 }}>
-                    {data.temporalData.map((row) => (
-                      <span key={row.year} style={{ flex: 1, textAlign: "center", fontFamily: FONT.sans, fontSize: 11, color: C.textMuted, marginTop: 8 }}>{row.year}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ borderTop: `1px solid ${C.borderLight}`, marginTop: 24, paddingTop: 16 }}>
-                <p style={{ fontFamily: FONT.sans, fontSize: 12, color: C.textMuted, textAlign: "center", margin: 0 }}>
-                  {isEn ? "Timeline note: undated files are excluded from this chart because the year is inferred from the filename." : "Note chronologique : les fichiers sans date exploitable ne figurent pas dans ce graphique, car l'annee est deduite du nom du fichier."}
-                </p>
-              </div>
-            </div>
-          </FadeIn>
-        )}
-
-        {activeTab === "categories" && (
-          <FadeIn>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
-              <div style={{ background: C.warmWhite, border: `1px solid ${C.border}`, borderRadius: 8, padding: "32px 28px" }}>
-                <h3 style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: 18, color: C.navy, margin: "0 0 24px" }}>{isEn ? "Theme distribution" : "Repartition thematique"}</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                  {data.categoryData.map((cat, i) => (
-                    <div key={i}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 6 }}>
-                        <span style={{ fontFamily: FONT.sans, fontSize: 14, fontWeight: 500, color: C.navy }}>{cat.category}</span>
-                        <span style={{ fontFamily: FONT.sans, fontSize: 12, color: C.textMuted }}>{cat.count} - {cat.pct}%</span>
-                      </div>
-                      <div style={{ height: 6, background: C.borderLight, borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${cat.pct}%`, background: `linear-gradient(90deg, ${cat.color}, ${cat.color}99)`, borderRadius: 3, transition: "width 1.5s cubic-bezier(0.22, 1, 0.36, 1)" }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ borderTop: `1px solid ${C.borderLight}`, marginTop: 20, paddingTop: 14, display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontFamily: FONT.sans, fontSize: 13, color: C.textMuted }}>{isEn ? "Classified items" : "Contenus classes"}</span>
-                  <span style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: 15, color: C.navy }}>{data.totalClassified}</span>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ background: C.warmWhite, border: `1px solid ${C.border}`, borderRadius: 8, padding: "28px 24px" }}>
-                  <h3 style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: 16, color: C.navy, margin: "0 0 20px" }}>{isEn ? "Top platforms mentioned" : "Plateformes les plus citees"}</h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    {data.platformData.map((platform, index) => (
-                      <div key={index}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
-                          <span style={{ fontFamily: FONT.sans, fontSize: 13, color: C.navy }}>{platform.platform}</span>
-                          <span style={{ fontFamily: FONT.sans, fontSize: 12, color: C.textMuted }}>{platform.count}</span>
-                        </div>
-                        <div style={{ height: 6, background: C.borderLight, borderRadius: 99, overflow: "hidden" }}>
-                          <div style={{ width: `${(platform.count / topPlatformCount) * 100}%`, height: "100%", background: `linear-gradient(90deg, ${C.navy}, ${C.navyLight})` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ background: `${C.gold}08`, border: `1px solid ${C.gold}33`, borderRadius: 8, padding: "20px 24px" }}>
-                  <h4 style={{ fontFamily: FONT.serif, fontWeight: 700, fontSize: 14, color: C.navy, margin: "0 0 8px" }}>{isEn ? "Reading note" : "Note de lecture"}</h4>
-                  <p style={{ fontFamily: FONT.sans, fontSize: 12, color: C.textLight, lineHeight: 1.7, margin: 0 }}>
-                    {isEn ? "Platform counts can exceed the number of files because one item may circulate across several platforms. Theme percentages are calculated on classified items only." : "Le total des plateformes peut depasser le nombre de fichiers car un meme contenu peut circuler sur plusieurs plateformes. Les pourcentages thematiques sont calcules uniquement sur les contenus classes."}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </FadeIn>
-        )}
-      </div>
-    </div>
-  );
+  return <ReportDashboard lang={lang} colors={C} fonts={FONT} Label={Label} Ornament={Ornament} FadeIn={FadeIn} />;
 }
 
 /* ===========================================
@@ -1044,7 +679,7 @@ function DemoPage({ lang }) {
   };
 
   /* PHOTOS : simule la sortie de detect_photos + predict_ai_or_real — format fidèle au pipeline */
-  const generatePhotos = (isAI) => {
+  const generatePhotos = (isAI, sourceFile = file) => {
     const count = randInt(1, 3);
     /* Captions style Florence-2 <CAPTION> : courts, factuels, anglais */
     const captions = [
@@ -1066,7 +701,7 @@ function DemoPage({ lang }) {
     ];
     const photos = [];
     const used = [];
-    const baseName = file?.name?.split(".")[0] || "image";
+    const baseName = sourceFile?.name?.split(".")[0] || "image";
     for (let n = 0; n < count; n++) {
       const w = pick([320, 467, 512, 640, 768, 800, 1024]);
       const h = pick([240, 350, 384, 480, 576, 600, 768]);
@@ -1090,6 +725,73 @@ function DemoPage({ lang }) {
       });
     }
     return photos;
+  };
+
+  const inferMockVerdict = (selectedFile) => {
+    const fileKey = normalizeLookup(selectedFile?.name);
+    const aiHints = ["ai", "ia", "generated", "genere", "deepfake", "midjourney", "dalle", "sdxl", "stable diffusion"];
+    const realHints = ["photo", "camera", "iphone", "screenshot", "capture", "scan", "dsc", "img"];
+
+    if (aiHints.some((hint) => fileKey.includes(hint))) return true;
+    if (realHints.some((hint) => fileKey.includes(hint))) return false;
+    return Math.random() >= 0.5;
+  };
+
+  const generateMockZones = (isAI) => {
+    const zoneRanges = isAI
+      ? [
+          ["Artefacts de génération", [68, 94]],
+          ["Cohérence des textures", [54, 88]],
+          ["Patterns spectraux", [49, 84]],
+          ["Contours et transitions", [42, 79]],
+        ]
+      : [
+          ["Artefacts de génération", [8, 28]],
+          ["Cohérence des textures", [12, 34]],
+          ["Patterns spectraux", [10, 30]],
+          ["Contours et transitions", [14, 36]],
+        ];
+
+    return zoneRanges.map(([label, [min, max]]) => ({
+      label,
+      score: randInt(min, max),
+    }));
+  };
+
+  const buildMockAnalysis = (selectedFile) => {
+    const isAI = inferMockVerdict(selectedFile);
+    const strongestScore = randFloat(74, 97);
+    const probAI = +(isAI ? strongestScore : 100 - strongestScore).toFixed(1);
+    const probReal = +(100 - probAI).toFixed(1);
+    const ocrText = generateOCR();
+    const description = generateDescription(isAI);
+    const photos = generatePhotos(isAI, selectedFile);
+    const totalAI = photos.filter((photo) => photo.verdict === "IA").length;
+    const fileFormat = selectedFile?.type?.split("/")[1]?.toUpperCase() || "UNKNOWN";
+    const fileSizeMo = selectedFile?.size ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} Mo` : "Inconnue";
+
+    return {
+      isAI,
+      confidence: Math.round(Math.max(probAI, probReal)),
+      probAI,
+      probReal,
+      ocrText,
+      ocrCharCount: ocrText.length,
+      description,
+      photos,
+      totalPhotos: photos.length,
+      totalAI,
+      totalReal: photos.length - totalAI,
+      metadata: [
+        { key: "Nom du fichier", val: selectedFile?.name || "image" },
+        { key: "Format", val: fileFormat },
+        { key: "Taille du fichier", val: fileSizeMo },
+        { key: "Mode d'analyse", val: "Simulation locale - serveur Python indisponible" },
+        { key: "Photos détectées", val: `${photos.length} photo(s) simulée(s)` },
+        { key: "Texte OCR", val: ocrText === "(aucun texte détecté)" ? "Aucun texte" : `${ocrText.length} caractères extraits` },
+      ],
+      zones: generateMockZones(isAI),
+    };
   };
 
   const runAnalysis = async () => {
@@ -1144,16 +846,29 @@ function DemoPage({ lang }) {
  
     } catch (error) {
       clearInterval(progressInterval);
-      setAnalyzing(false);
-      setProgress(0);
       console.error("Erreur :", error);
-      alert(
-        "Erreur : le serveur Python n'est pas lancé.\n\n" +
-        "1. Ouvrez un terminal dans le dossier 'pipeline'\n" +
-        "2. Tapez : lancer.bat (Windows) ou python server.py\n" +
-        "3. Attendez de voir 'SERVEUR PRÊT'\n" +
-        "4. Réessayez"
-      );
+
+      const isNetworkError =
+        error instanceof TypeError ||
+        /failed to fetch|networkerror|load failed/i.test(String(error?.message || ""));
+
+      if (!isNetworkError) {
+        setAnalyzing(false);
+        setProgress(0);
+        alert(
+          "Erreur : le serveur Python a renvoyé une erreur.\n\n" +
+          "Vérifiez la console du backend dans le dossier 'pipeline', puis réessayez."
+        );
+        return;
+      }
+
+      const fallbackResult = buildMockAnalysis(file);
+      setProgress(100);
+      setTimeout(() => {
+        setResult(fallbackResult);
+        setAnalyzing(false);
+        setActiveResultTab("verdict");
+      }, 500);
     }
   };
 
