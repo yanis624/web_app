@@ -453,7 +453,7 @@ export default function ReportDashboard({ lang, colors, fonts, Label, Ornament, 
           >
             {isEn
               ? "This dashboard presents the main results of a textual analysis conducted on a corpus of disinformation-related content. It highlights the circulation platforms, the dominant topics and the rhetorical patterns that structure the analyzed documents."
-              : "Ce tableau de bord presente les principaux resultats d'une analyse textuelle menee sur un corpus de contenus lies a la desinformation. Il met en lumiere les plateformes de circulation, les thematiques dominantes et les patterns rhetoriques qui structurent les documents analyses."}
+              : "Ce tableau de bord présente les principaux résultats d'une analyse textuelle menée sur un corpus de contenus liés à la désinformation. Il met en lumière les plateformes de circulation, les thématiques dominantes et les patterns rhétoriques qui structurent les documents analysés."}
           </p>
         </div>
 
